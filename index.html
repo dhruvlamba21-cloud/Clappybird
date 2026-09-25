@@ -1,0 +1,1027 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Cat Flap 🐱</title>
+<style>
+*{box-sizing:border-box}
+:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html,body{margin:0;width:100%;height:100%;overflow:hidden}
+body{
+  display:grid;place-items:center;
+  background:radial-gradient(circle at top,#263b63,#101521 70%);
+  font-family:system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
+}
+#wrap{
+  position:relative;width:min(94vw,430px);height:min(94vh,760px);
+  border-radius:24px;overflow:hidden;
+  box-shadow:0 24px 70px #0009;background:#8edbff;
+  transition:box-shadow .35s ease,transform .15s ease;
+}
+#wrap.menacing{box-shadow:0 0 40px #b3132d66,0 24px 80px #000c}
+canvas{width:100%;height:100%;display:block;touch-action:manipulation}
+#score{
+  position:absolute;top:18px;left:0;right:0;text-align:center;
+  font-size:54px;font-weight:900;color:#fff;
+  text-shadow:0 4px 0 #0005,0 8px 20px #0003;
+  pointer-events:none;
+}
+#best{
+  position:absolute;top:78px;left:0;right:0;text-align:center;
+  color:#ffffffcc;font-size:14px;font-weight:800;
+  text-shadow:0 2px 4px #0005;pointer-events:none
+}
+#modeLabel{
+  position:absolute;top:102px;left:0;right:0;text-align:center;
+  font-size:11px;font-weight:900;letter-spacing:1.5px;
+  color:#fff9;text-shadow:0 2px 5px #0006;pointer-events:none
+}
+#hint{
+  position:absolute;left:0;right:0;bottom:22px;text-align:center;
+  color:#fff;font-weight:900;font-size:14px;letter-spacing:.4px;
+  text-shadow:0 3px 8px #0007;pointer-events:none
+}
+.icon-btn{
+  position:absolute;top:14px;width:38px;height:38px;border-radius:50%;
+  border:1px solid #ffffff33;background:#0b1220a6;backdrop-filter:blur(6px);
+  color:#fff;font-size:17px;line-height:1;display:grid;place-items:center;
+  cursor:pointer;z-index:20;box-shadow:0 4px 14px #0004;
+  transition:transform .12s ease,opacity .12s ease;padding:0
+}
+.icon-btn:active{transform:scale(.88)}
+.icon-btn[aria-pressed="false"]{opacity:.55}
+#soundBtn{left:14px}
+#hapticBtn{right:14px}
+#wrap.menacing .icon-btn{border-color:#ff5a6b40;background:#1a0508a6}
+#countdown{
+  position:absolute;inset:0;display:grid;place-items:center;
+  font-size:110px;font-weight:1000;color:#fff;
+  text-shadow:0 8px 30px #0008;pointer-events:none;
+  opacity:0;transform:scale(.8);transition:opacity .18s ease,transform .18s ease;
+}
+#countdown.show{opacity:1;transform:scale(1)}
+#overlay{
+  position:absolute;inset:0;display:grid;place-items:center;
+  background:#05101e55;backdrop-filter:blur(4px);
+}
+.card{
+  width:82%;padding:28px 24px;text-align:center;
+  border-radius:22px;background:#fffffff2;
+  box-shadow:0 18px 60px #0005;color:#152033
+}
+.card h1{margin:0 0 8px;font-size:34px}
+.card p{margin:7px 0 20px;font-weight:700;color:#4b5563}
+.modes{display:grid;gap:12px}
+.mode-btn{
+  border:0;border-radius:14px;padding:14px 18px;
+  font-size:16px;font-weight:900;cursor:pointer;color:white;
+  box-shadow:0 8px 18px #0002;
+}
+.normal-btn{background:#25a55b}
+.menacing-btn{background:#b91c3c}
+#selectedInfo{margin:16px 0 0;font-size:12px;color:#6b7280;font-weight:700}
+.hidden{display:none!important}
+body.menacing{
+  background:radial-gradient(circle at top,#360a11,#090909 72%);
+}
+body.menacing .card{
+  background:#160b0d;color:#f8e8e8;border:1px solid #7f1d2d;
+}
+body.menacing .card p,#wrap.menacing #selectedInfo{color:#d7a9ae}
+body.menacing #hint{color:#ffd7dc}
+</style>
+</head>
+<body>
+<div id="wrap">
+  <canvas id="game" width="430" height="760"></canvas>
+  <div id="score">0</div>
+  <div id="best">BEST 0</div>
+  <div id="modeLabel">NORMAL</div>
+  <div id="hint">TAP • CLICK • SPACE TO FLY</div>
+  <div id="countdown"></div>
+  <button id="soundBtn" class="icon-btn" aria-label="Toggle sound" aria-pressed="true">🔊</button>
+  <button id="hapticBtn" class="icon-btn hidden" aria-label="Toggle vibration" aria-pressed="true">📳</button>
+
+  <div id="overlay">
+    <div class="card">
+      <h1 id="title">🐱 CAT FLAP</h1>
+      <p id="subtitle">Choose your difficulty.</p>
+      <div class="modes">
+        <button class="mode-btn normal-btn" id="normalBtn">🟢 NORMAL</button>
+        <button class="mode-btn menacing-btn" id="menacingBtn">🔴 MENACING</button>
+      </div>
+      <div id="selectedInfo">Normal: slower fall • gentle start • gradual speed-up</div>
+    </div>
+  </div>
+</div>
+
+<script>
+const canvas=document.getElementById("game");
+const ctx=canvas.getContext("2d");
+const W=canvas.width,H=canvas.height,ground=88;
+
+const scoreEl=document.getElementById("score");
+const bestEl=document.getElementById("best");
+const modeLabel=document.getElementById("modeLabel");
+const hintEl=document.getElementById("hint");
+const countdownEl=document.getElementById("countdown");
+const overlay=document.getElementById("overlay");
+const titleEl=document.getElementById("title");
+const subtitleEl=document.getElementById("subtitle");
+const selectedInfoEl=document.getElementById("selectedInfo");
+const normalBtn=document.getElementById("normalBtn");
+const menacingBtn=document.getElementById("menacingBtn");
+const wrap=document.getElementById("wrap");
+
+let mode="normal";
+let bests=JSON.parse(localStorage.getItem("catFlapBests")||'{"normal":0,"menacing":0}');
+let game,last=0,countdownTimer=null;
+
+const MODES={
+  normal:{
+    gravity:.30,
+    flap:-6.8,
+    baseSpeed:1.75,
+    maxSpeed:3.0,
+    gap:184,
+    spawnFrames:122,
+    minGap:175,
+    label:"NORMAL",
+    description:"Slower fall • gradual speed-up"
+  },
+  menacing:{
+    gravity:.40,
+    flap:-7.1,
+    baseSpeed:2.75,
+    maxSpeed:4.15,
+    gap:156,
+    spawnFrames:101,
+    minGap:151,
+    label:"MENACING",
+    description:"Angry cat • dark theme • tighter gaps"
+  }
+};
+
+/* =====================================================================
+   🎵 AUDIO + HAPTICS ENGINE
+   Everything is synthesised live with the Web Audio API — no audio files.
+
+   How the music adapts:
+   • TEMPO   follows the game's scroll speed (NORMAL ≈ 88→130 BPM,
+             MENACING ≈ 123→172 BPM), so menacing starts faster AND ends faster.
+   • LAYERS  fade in as an "intensity" value rises (0 = slowest normal speed,
+             1 = fastest menacing speed). Menacing begins at ~0.42, so it already
+             has drums, bass and riff on the first bar — then it grows teeth.
+   • KEY LIFT near top speed the whole song jumps up a whole tone.
+   • DEATH   music low-passes and tape-drops away under a "bonk" stinger.
+   ===================================================================== */
+
+// Quick mix knobs — nudge these if something sits too loud/quiet on your speakers.
+const MIX={master:.9,music:.85,sfx:.9,drums:1,bass:1,pad:1,lead:1,arp:1};
+
+const Sound=(()=>{
+  const BPM_MIN=88,BPM_MAX=172;
+  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+  const mtof=m=>440*Math.pow(2,(m-69)/12);
+  const pref=k=>{try{return localStorage.getItem(k)!=="0"}catch(e){return true}};
+  const savePref=(k,v)=>{try{localStorage.setItem(k,v?"1":"0")}catch(e){}};
+
+  /* ---------- musical material ---------- */
+  const MAJ=[0,4,7],MIN=[0,3,7];
+  // [bass root MIDI, triad]. 8-bar loops.
+  const PROG={
+    // C major, bright & bouncy:  C  G  Am  F | C  G  F  G
+    normal:[[48,MAJ],[43,MAJ],[45,MIN],[41,MAJ],[48,MAJ],[43,MAJ],[41,MAJ],[43,MAJ]],
+    // D minor with a major-V (A) for that harmonic-minor menace: Dm Bb Gm A | Dm Bb C A
+    menacing:[[50,MIN],[46,MAJ],[43,MIN],[45,MAJ],[50,MIN],[46,MAJ],[48,MAJ],[45,MAJ]]
+  };
+  // melody notes: [step 0-15, semitones above base, length in steps]
+  const mel=bars=>bars.map(b=>{const o={};for(const n of b)o[n[0]]=[n[1],n[2]];return o});
+  const MEL={
+    normal:mel([
+      [[0,4,3],[4,7,2],[6,9,2],[8,7,4],[12,4,4]],
+      [[0,2,3],[4,7,2],[6,11,2],[8,11,4],[12,7,4]],
+      [[0,12,3],[4,9,2],[6,4,2],[8,9,4],[12,12,4]],
+      [[0,9,3],[4,12,2],[6,9,2],[8,5,4],[12,9,2],[14,7,2]],
+      [[0,7,3],[4,4,2],[6,7,2],[8,12,4],[12,7,4]],
+      [[0,11,3],[4,7,2],[6,14,2],[8,11,4],[12,7,4]],
+      [[0,12,3],[4,9,2],[6,5,2],[8,9,4],[12,12,4]],
+      [[0,14,2],[2,11,2],[4,7,2],[6,11,2],[8,14,2],[10,11,2],[12,7,4]]
+    ]),
+    menacing:mel([
+      [[0,0,2],[2,1,2],[4,0,2],[6,-2,2],[8,-5,4],[12,-2,2],[14,0,2]],           // Dm  (Eb = phrygian bite)
+      [[0,3,2],[2,2,2],[4,3,2],[6,0,2],[8,-4,4],[12,0,2],[14,3,2]],             // Bb  (E = tritone)
+      [[0,5,2],[2,3,2],[4,0,2],[6,-2,2],[8,-4,4],[12,-7,2],[14,-5,2]],          // Gm
+      [[0,7,2],[2,11,2],[4,7,2],[6,2,2],[8,11,2],[10,12,2],[12,11,2],[14,7,2]], // A   (C# leading tone)
+      [[0,0,2],[2,1,2],[4,0,2],[6,-2,2],[8,-5,4],[12,-2,2],[14,0,2]],
+      [[0,8,2],[2,7,2],[4,3,2],[6,2,2],[8,3,4],[12,0,4]],
+      [[0,10,2],[2,5,2],[4,2,2],[6,5,2],[8,10,4],[12,5,2],[14,2,2]],
+      [[0,7,2],[2,11,2],[4,14,2],[6,12,2],[8,11,2],[10,7,2],[12,2,2],[14,-1,2]]
+    ])
+  };
+  const MELBASE={normal:72,menacing:74}; // C5 / D5
+  // bass patterns: step → semitone offset from chord root
+  const BASS={
+    normal:[{0:0,8:0,12:7},{0:0,2:12,4:0,6:12,8:0,10:12,12:7,14:12}],
+    menacing:[{0:0,2:0,4:0,6:12,8:0,10:0,12:0,14:12},
+              {0:0,2:0,3:0,4:0,6:0,7:12,8:0,10:0,11:0,12:0,14:0,15:12}]
+  };
+  const ARP_SHAPE=[0,1,2,3,2,1,3,2];
+
+  /* ---------- state ---------- */
+  let ac=null,master,comp,musicBus,musicFilter,padBus,sfxBus,reverb,delay,distIn,noiseBuf,unlocked=false;
+  let enabled=pref("catFlapSound");
+  let timer=null,playing=false,nextTime=0,step=0,bar=0,transpose=0,lifted=false;
+  const P={mode:"normal",speed:1.75,ramp:0,i:0,bpm:BPM_MIN};
+
+  /* ---------- setup ---------- */
+  function impulse(sec,decay){
+    const len=(ac.sampleRate*sec)|0,buf=ac.createBuffer(2,len,ac.sampleRate);
+    for(let c=0;c<2;c++){const d=buf.getChannelData(c);for(let i=0;i<len;i++)d[i]=(Math.random()*2-1)*Math.pow(1-i/len,decay);}
+    return buf;
+  }
+  function driveCurve(k){
+    const n=1024,c=new Float32Array(n);
+    for(let i=0;i<n;i++){const x=i*2/n-1;c[i]=Math.tanh(x*k);}
+    return c;
+  }
+  function init(){
+    if(ac)return true;
+    const AC=window.AudioContext||window.webkitAudioContext;
+    if(!AC)return false;
+    try{if(navigator.audioSession)navigator.audioSession.type="playback";}catch(e){} // iOS: play even with silent switch on
+    ac=new AC();
+
+    comp=ac.createDynamicsCompressor();
+    comp.threshold.value=-16;comp.knee.value=20;comp.ratio.value=4;comp.attack.value=.004;comp.release.value=.2;
+    master=ac.createGain();master.gain.value=enabled?MIX.master:0;
+    master.connect(comp);comp.connect(ac.destination);
+
+    musicFilter=ac.createBiquadFilter();musicFilter.type="lowpass";musicFilter.frequency.value=9000;musicFilter.Q.value=.5;
+    musicFilter.connect(master);
+    musicBus=ac.createGain();musicBus.gain.value=MIX.music;musicBus.connect(musicFilter);
+    padBus=ac.createGain();padBus.connect(musicBus);           // pads get "side-chained" by the kick
+    sfxBus=ac.createGain();sfxBus.gain.value=MIX.sfx;sfxBus.connect(master);
+
+    reverb=ac.createConvolver();reverb.buffer=impulse(1.9,2.4);
+    const rOut=ac.createGain();rOut.gain.value=.55;reverb.connect(rOut);rOut.connect(master);
+
+    delay=ac.createDelay(2);delay.delayTime.value=.3;      // tempo-synced dotted-8th echo
+    const dLp=ac.createBiquadFilter();dLp.type="lowpass";dLp.frequency.value=2600;
+    const dFb=ac.createGain();dFb.gain.value=.34;
+    const dOut=ac.createGain();dOut.gain.value=.5;
+    delay.connect(dLp);dLp.connect(dFb);dFb.connect(delay);dLp.connect(dOut);dOut.connect(master);
+
+    distIn=ac.createGain();                                 // grit for the menacing lead
+    const shaper=ac.createWaveShaper();shaper.curve=driveCurve(3.2);shaper.oversample="2x";
+    const dOut2=ac.createGain();dOut2.gain.value=.55;
+    distIn.connect(shaper);shaper.connect(dOut2);dOut2.connect(musicBus);
+
+    noiseBuf=ac.createBuffer(1,ac.sampleRate*2,ac.sampleRate);
+    const nd=noiseBuf.getChannelData(0);for(let i=0;i<nd.length;i++)nd[i]=Math.random()*2-1;
+    return true;
+  }
+  function unlock(){
+    if(!init())return;
+    try{if(ac.state!=="running"){const p=ac.resume();if(p&&p.catch)p.catch(()=>{});}}catch(e){}
+    if(!unlocked){ // iOS needs a real (silent) buffer started inside a gesture
+      unlocked=true;
+      try{const s=ac.createBufferSource();s.buffer=ac.createBuffer(1,1,22050);s.connect(ac.destination);s.start(0);}catch(e){}
+    }
+  }
+
+  /* ---------- voice building blocks ---------- */
+  function out(g,o){
+    const dest=o.bus||(o.dist?distIn:(o.sfx?sfxBus:musicBus));
+    g.connect(dest);
+    if(o.rev){const s=ac.createGain();s.gain.value=o.rev;g.connect(s);s.connect(reverb);}
+    if(o.del){const s=ac.createGain();s.gain.value=o.del;g.connect(s);s.connect(delay);}
+  }
+  function tone(o){
+    const t=o.t,dur=Math.max(.02,o.dur),a=Math.min(o.a??.004,dur*.5),r=o.r??.06,vol=Math.max(.0002,o.vol??.15);
+    const osc=ac.createOscillator();osc.type=o.type||"sine";
+    osc.frequency.setValueAtTime(o.f,t);
+    if(o.fEnd)osc.frequency.exponentialRampToValueAtTime(o.fEnd,t+(o.fDur||dur));
+    if(o.detune)osc.detune.value=o.detune;
+    if(o.vib){const l=ac.createOscillator(),lg=ac.createGain();l.frequency.value=5.5;lg.gain.value=o.vib;l.connect(lg);lg.connect(osc.detune);l.start(t);l.stop(t+dur+r+.03);}
+    const g=ac.createGain();
+    g.gain.setValueAtTime(.0001,t);
+    g.gain.exponentialRampToValueAtTime(vol,t+a);
+    g.gain.setValueAtTime(vol,t+dur);
+    g.gain.exponentialRampToValueAtTime(.0001,t+dur+r);
+    let node=osc;
+    if(o.lp){
+      const f=ac.createBiquadFilter();f.type="lowpass";f.Q.value=o.q||.7;
+      f.frequency.setValueAtTime(o.lp,t);
+      if(o.lpEnd)f.frequency.exponentialRampToValueAtTime(o.lpEnd,t+dur);
+      osc.connect(f);node=f;
+    }
+    node.connect(g);out(g,o);
+    osc.start(t);osc.stop(t+dur+r+.03);
+  }
+  function noise(o){
+    const t=o.t,dur=o.dur,vol=Math.max(.0002,o.vol??.2),a=o.a??.002;
+    const s=ac.createBufferSource();s.buffer=noiseBuf;s.loop=true;
+    const f=ac.createBiquadFilter();f.type=o.ft||"highpass";f.Q.value=o.q||.7;
+    f.frequency.setValueAtTime(o.ff,t);
+    if(o.ffEnd)f.frequency.exponentialRampToValueAtTime(o.ffEnd,t+dur);
+    const g=ac.createGain();
+    g.gain.setValueAtTime(.0001,t);
+    if(o.rise){g.gain.exponentialRampToValueAtTime(vol,t+dur*.96);g.gain.exponentialRampToValueAtTime(.0001,t+dur);}
+    else{g.gain.exponentialRampToValueAtTime(vol,t+a);g.gain.exponentialRampToValueAtTime(.0001,t+dur);}
+    s.connect(f);f.connect(g);out(g,o);
+    s.start(t,Math.random()*1.5);s.stop(t+dur+.05);
+  }
+
+  /* ---------- instruments ---------- */
+  function kick(t,v,m){
+    v*=MIX.drums;const d=m==="menacing";
+    tone({t,f:d?135:160,fEnd:d?38:46,fDur:.12,dur:d?.3:.2,a:.001,r:.06,vol:.7*v});
+    noise({t,dur:.025,ff:d?1800:3000,ft:"bandpass",q:.9,vol:.1*v});
+  }
+  function snare(t,v,m){
+    v*=MIX.drums;const d=m==="menacing";
+    noise({t,dur:d?.24:.15,ff:d?1400:1800,vol:(d?.3:.22)*v,rev:d?.25:.08});
+    tone({t,f:d?170:210,fEnd:d?110:140,fDur:.08,dur:.09,type:"triangle",vol:.2*v,a:.001,r:.03});
+  }
+  function hat(t,v,open,m){
+    v*=MIX.drums;
+    noise({t,dur:open?.2:.035,ff:m==="menacing"?8500:7200,vol:(open?.07:.06)*v,a:.001});
+  }
+  function crash(t,v){noise({t,dur:1.4,ff:4500,vol:.14*v*MIX.drums,rev:.35});}
+  function riser(t,dur,men,sfx){
+    noise({t,dur,ff:400,ffEnd:7000,ft:"bandpass",q:2.2,vol:(men?.16:.09)*MIX.drums,rise:true,rev:.2,sfx:!!sfx});
+  }
+  function bass(t,midi,dur,v,m){
+    v*=MIX.bass;const f=mtof(midi);
+    if(m==="menacing"){
+      tone({t,f,dur,type:"sawtooth",vol:.17*v,lp:1600,lpEnd:260,q:4,a:.003,r:.04});
+      tone({t,f:f*1.006,dur,type:"sawtooth",vol:.09*v,lp:1200,lpEnd:240,a:.003,r:.04});
+      tone({t,f:f/2,dur,vol:.26*v,a:.004,r:.05});
+    }else{
+      tone({t,f,dur,type:"square",vol:.11*v,lp:1500,lpEnd:380,q:1.5,a:.003,r:.03});
+      tone({t,f:f/2,dur,type:"triangle",vol:.22*v,a:.004,r:.04});
+    }
+  }
+  function pad(t,notes,dur,m){
+    const d=m==="menacing";
+    for(const n of notes)for(const det of[-7,7])
+      tone({t,f:mtof(n),detune:det,dur,a:.35,r:.6,type:d?"sawtooth":"triangle",
+            vol:(d?.022:.045)*MIX.pad,lp:d?700:2400,lpEnd:d?1500:0,bus:padBus,rev:.45});
+  }
+  function lead(t,midi,dur,v,m){
+    v*=MIX.lead;const f=mtof(midi);
+    if(m==="menacing"){
+      tone({t,f,dur,type:"sawtooth",vol:.075*v,lp:3200,q:1.2,a:.004,r:.08,dist:true,rev:.25,del:.22});
+      tone({t,f,detune:11,dur,type:"sawtooth",vol:.045*v,lp:3000,a:.004,r:.08,dist:true,rev:.2});
+    }else{
+      tone({t,f,dur,type:"square",vol:.06*v,lp:3600,a:.004,r:.07,rev:.22,del:.3});
+      tone({t,f,dur,type:"triangle",vol:.05*v,a:.004,r:.07});
+    }
+  }
+  function arp(t,midi,dur,v){
+    tone({t,f:mtof(midi),dur,type:"square",vol:.035*v*MIX.arp,lp:3000,a:.003,r:.04,rev:.15,del:.25});
+  }
+  function stab(t,notes,dur,v){
+    for(const n of notes)
+      tone({t,f:mtof(n),dur,type:"sawtooth",vol:.04*v*MIX.lead,lp:2200,lpEnd:600,a:.002,r:.1,rev:.3});
+  }
+
+  /* ---------- the sequencer ---------- */
+  function scheduleStep(s,t){
+    const m=P.mode,men=m==="menacing",i=P.i;
+    const sd=60/P.bpm/4;               // one 16th note
+    const bi=bar%8;
+
+    // "final push": key change up a whole tone near top speed, on a 4-bar boundary
+    if(s===0&&!lifted&&P.ramp>=.8&&bar>0&&bar%4===0){lifted=true;transpose=2;crash(t,1);}
+    const T=transpose,ch=PROG[m][bi],root=ch[0]+T,tones=ch[1];
+    const rnd=()=>.92+Math.random()*.16;
+
+    if(s===0){
+      musicFilter.frequency.setTargetAtTime(6000+i*10000,t,.4);   // mix opens up as it speeds up
+      delay.delayTime.setTargetAtTime(clamp(sd*3,.05,1.4),t,.05);
+      if(bar>0&&bi===0)crash(t,men?1:.6);
+      if(bi===7&&i>=.3)riser(t,sd*16,men,false);
+      pad(t,tones.map(x=>root+12+x),sd*16,m);
+    }
+
+    // kick (+ sidechain-style pump on the pads)
+    let k=s===0||s===8;
+    if(!k&&s%4===0&&i>=(men?.3:.32))k=true;
+    if(!k&&men&&((i>=.7&&s===10)||(i>=.9&&s===14)))k=true;
+    if(k){
+      kick(t,rnd(),m);
+      padBus.gain.cancelScheduledValues(t);
+      padBus.gain.setValueAtTime(.4,t);
+      padBus.gain.setTargetAtTime(1,t+.02,sd*1.2);
+    }
+
+    // snare, with a fill in the last bar of every 8
+    if(bi===7&&s>=12&&i>=.2)snare(t,.45+(s-12)*.18,m);
+    else if(i>=.12&&(s===4||s===12))snare(t,rnd(),m);
+    else if(men&&i>=.85&&s===15)snare(t,.5,m);
+
+    // hats: off-beats → 8ths → 16ths with open hats
+    if(i<.2){if(s%4===2)hat(t,.6*rnd(),false,m);}
+    else if(i<.5){if(s%2===0)hat(t,(s%4===2?1:.6)*rnd(),false,m);}
+    else{
+      if(s%8===6)hat(t,.9,true,m);
+      else hat(t,(s%4===2?1:s%2===0?.65:.4)*rnd(),false,m);
+    }
+
+    // bass
+    const gallop=men?i>=.6:i>=.2;
+    const bp=BASS[m][gallop?1:0];
+    if(bp[s]!==undefined)bass(t,root+bp[s],sd*(men&&i>=.6?1.3:1.8),s===0?1:.85,m);
+
+    // melody (the hook), with layers stacking on top as intensity grows
+    const nt=MEL[m][bi][s];
+    if(nt){
+      const base=MELBASE[m]+T+nt[0],d=nt[1]*sd*.92;
+      const vel=men?(.85+.15*i):(.7+.6*i);
+      lead(t,base,d,vel,m);
+      if(!men&&i>=.5)lead(t,base+12,d,vel*.35,m);
+      if(men&&i>=.6)lead(t,base-12,d,vel*.55,m);
+      if(men&&i>=.85)lead(t,base+12,d,vel*.3,m);
+    }
+
+    // normal: sparkly chip arpeggio;  menacing: off-beat chord stabs
+    if(!men&&i>=.32&&(i>=.45||s%2===0)){
+      const idx=ARP_SHAPE[s%8];
+      arp(t,root+12+(idx===3?tones[0]+12:tones[idx]),sd*.85,.5+.5*i);
+    }
+    if(men&&i>=.7&&(s===6||s===14))stab(t,tones.map(x=>root+12+x),sd*1.5,1);
+  }
+  function tick(){
+    if(!playing||!ac)return;
+    const now=ac.currentTime;
+    if(nextTime<now-.25)nextTime=now+.03;      // tab was throttled → don't flood the queue
+    while(nextTime<now+.14){
+      scheduleStep(step,nextTime);
+      nextTime+=60/P.bpm/4;
+      if(++step>=16){step=0;bar++;}
+    }
+  }
+
+  /* ---------- public API ---------- */
+  function setParams(speed,ramp){
+    const lo=MODES.normal.baseSpeed,hi=MODES.menacing.maxSpeed;
+    P.speed=speed;P.ramp=ramp;
+    P.i=clamp((speed-lo)/(hi-lo),0,1);
+    P.bpm=BPM_MIN+P.i*(BPM_MAX-BPM_MIN);
+  }
+  function startMusic(m,speed){
+    if(!init())return;
+    unlock();stopMusic();
+    const t=ac.currentTime;
+    musicBus.gain.cancelScheduledValues(t);musicBus.gain.setValueAtTime(MIX.music,t);
+    musicFilter.frequency.cancelScheduledValues(t);musicFilter.frequency.setValueAtTime(9000,t);
+    padBus.gain.cancelScheduledValues(t);padBus.gain.setValueAtTime(1,t);
+    P.mode=m;setParams(speed,0);
+    transpose=0;lifted=false;step=0;bar=0;
+    nextTime=t+.06;playing=true;
+    timer=setInterval(tick,25);tick();
+  }
+  function stopMusic(){playing=false;if(timer){clearInterval(timer);timer=null;}}
+
+  function flap(m){
+    if(!ac)return;
+    const t=ac.currentTime+.001,T=transpose;
+    if(m==="menacing"){
+      const n=[50,53,55,57,60][(Math.random()*5)|0]+T,f=mtof(n);
+      tone({t,f,fEnd:f*.7,fDur:.1,dur:.1,type:"sawtooth",vol:.07,lp:1500,a:.003,r:.05,sfx:true});
+      noise({t,dur:.12,ff:2600,ffEnd:700,ft:"bandpass",q:1.2,vol:.14,sfx:true});
+    }else{
+      const n=[72,74,76,79,81][(Math.random()*5)|0]+T,f=mtof(n);
+      tone({t,f:f*.8,fEnd:f,fDur:.07,dur:.09,type:"triangle",vol:.1,a:.003,r:.06,sfx:true,rev:.15});
+      noise({t,dur:.09,ff:2200,ffEnd:5000,ft:"bandpass",q:.8,vol:.06,sfx:true});
+    }
+  }
+  function score(n,m){
+    if(!ac)return;
+    const t=ac.currentTime+.001,T=transpose,men=m==="menacing";
+    const sc=men?[0,3,5,7,10,12,15,17]:[0,2,4,7,9,12,14,16];
+    const base=men?74:84;
+    const f=mtof(base+T+sc[(n-1)%sc.length]);
+    tone({t,f,dur:.1,vol:.11,r:.3,sfx:true,rev:.3});
+    tone({t,f:f*2,dur:.06,vol:.04,r:.2,sfx:true});
+    tone({t,f:f*3,dur:.04,type:"triangle",vol:.025,r:.12,sfx:true});
+    if(n%10===0){ // milestone flourish
+      const shape=men?[0,3,7,12]:[0,4,7,12];
+      shape.forEach((x,k)=>tone({t:t+.09+k*.07,f:mtof(base+T+x),dur:.07,type:"square",vol:.05,lp:3200,r:.2,sfx:true,rev:.3}));
+    }
+  }
+  function countdownStart(m){
+    if(!ac)return;
+    stopMusic();
+    if(m==="menacing")riser(ac.currentTime+.02,2.5,true,true);
+  }
+  function tickBeep(m){
+    if(!ac)return;
+    const t=ac.currentTime+.005,men=m==="menacing";
+    tone({t,f:mtof(men?62:72),dur:.09,type:men?"sawtooth":"square",vol:.09,lp:2500,r:.06,sfx:true});
+    if(men)tone({t,f:120,fEnd:45,dur:.18,vol:.4,a:.002,sfx:true});   // heartbeat thump
+  }
+  function go(m){
+    if(!ac)return;
+    const t=ac.currentTime+.005,men=m==="menacing";
+    const shape=men?[0,3,7,12]:[0,4,7,12],base=men?62:72;
+    shape.forEach(x=>tone({t,f:mtof(base+x),dur:.3,type:men?"sawtooth":"square",vol:.06,lp:men?2200:3200,a:.005,r:.5,sfx:true,rev:.3}));
+    if(men)noise({t,dur:1.2,ff:4500,vol:.16,rev:.4,sfx:true});
+  }
+  function die(m){
+    if(!ac)return;
+    stopMusic();
+    const t=ac.currentTime+.005,men=m==="menacing";
+    // music sinks under a closing low-pass
+    musicFilter.frequency.cancelScheduledValues(t);
+    musicFilter.frequency.setValueAtTime(clamp(musicFilter.frequency.value,300,16000),t);
+    musicFilter.frequency.exponentialRampToValueAtTime(140,t+.7);
+    musicBus.gain.cancelScheduledValues(t);
+    musicBus.gain.setTargetAtTime(0,t+.05,.25);
+    // BONK
+    tone({t,f:260,fEnd:52,fDur:.22,dur:.28,vol:.55,a:.002,r:.1,sfx:true});
+    noise({t,dur:.18,ff:900,ffEnd:200,ft:"lowpass",vol:.32,sfx:true});
+    if(men){ // doom: sub boom + tritone drone
+      tone({t:t+.02,f:70,fEnd:30,fDur:1,dur:1.2,vol:.5,a:.01,r:.6,sfx:true});
+      for(const n of[38,44,50])
+        tone({t:t+.05,f:mtof(n),dur:1.4,type:"sawtooth",vol:.06,lp:600,lpEnd:150,a:.02,r:1,sfx:true,rev:.6});
+      noise({t:t+.02,dur:1.6,ff:2500,vol:.16,rev:.5,sfx:true});
+    }else{ // classic sad-trombone "wah wah wah waaah"
+      [[65,.3],[64,.3],[63,.3],[62,.9]].reduce((at,[n,d],idx,arr)=>{
+        const last=idx===arr.length-1,f=mtof(n);
+        tone({t:at,f,fEnd:last?f*.9:0,fDur:d,dur:d,type:"sawtooth",vol:.08,lp:350,lpEnd:1400,q:3,a:.03,r:.08,
+              vib:last?28:0,sfx:true,rev:.2});
+        return at+d+.04;
+      },t+.3);
+    }
+  }
+  function blip(){
+    if(!ac)return;
+    const t=ac.currentTime+.005;
+    tone({t,f:660,dur:.06,type:"triangle",vol:.1,sfx:true});
+    tone({t:t+.07,f:990,dur:.08,type:"triangle",vol:.1,r:.15,sfx:true});
+  }
+  function setEnabled(v){
+    enabled=!!v;savePref("catFlapSound",enabled);
+    if(ac)master.gain.setTargetAtTime(enabled?MIX.master:0,ac.currentTime,.03);
+  }
+  function suspend(){if(ac&&ac.state==="running")ac.suspend().catch(()=>{});}
+  function resume(){if(ac&&ac.state==="suspended")ac.resume().catch(()=>{});}
+
+  return{unlock,setParams,startMusic,stopMusic,flap,score,countdownStart,tick:tickBeep,go,die,blip,
+         setEnabled,isEnabled:()=>enabled,suspend,resume};
+})();
+
+/* ---------- haptics ---------- */
+const Haptics=(()=>{
+  const pref=k=>{try{return localStorage.getItem(k)!=="0"}catch(e){return true}};
+  const canVibrate=typeof navigator.vibrate==="function";          // Android Chrome/Firefox
+  const touchy=("ontouchstart" in window)||navigator.maxTouchPoints>0;
+  let enabled=pref("catFlapHaptics"),iosLabel=null;
+
+  // iOS 18+ Safari has no vibrate(), but toggling a <input switch> gives a light haptic tick.
+  if(!canVibrate&&touchy){
+    try{
+      const box=document.createElement("input");box.type="checkbox";box.id="hapticSwitch";box.setAttribute("switch","");
+      const lab=document.createElement("label");lab.htmlFor="hapticSwitch";lab.setAttribute("aria-hidden","true");
+      lab.style.cssText="position:fixed;left:-100px;top:0;width:1px;height:1px;opacity:0;pointer-events:none";
+      box.style.cssText="position:fixed;left:-100px;top:0;opacity:0;pointer-events:none";
+      document.body.appendChild(box);document.body.appendChild(lab);iosLabel=lab;
+    }catch(e){}
+  }
+  function fire(pattern){
+    if(!enabled)return;
+    try{
+      if(canVibrate){navigator.vibrate(pattern);return;}
+      if(iosLabel){
+        const seq=Array.isArray(pattern)?pattern:[pattern];let at=0;
+        seq.forEach((d,idx)=>{if(idx%2===0){if(at)setTimeout(()=>iosLabel.click(),at);else iosLabel.click();}at+=d;});
+      }
+    }catch(e){}
+  }
+  return{
+    supported:canVibrate||!!iosLabel,
+    isEnabled:()=>enabled,
+    setEnabled(v){enabled=!!v;try{localStorage.setItem("catFlapHaptics",enabled?"1":"0")}catch(e){}},
+    tap:m=>fire(m==="menacing"?16:10),                                   // every flap
+    ui:()=>fire(15),                                                      // buttons / restart
+    die:m=>fire(m==="menacing"?[110,45,80,45,220]:[70,40,110])            // hitting a snake
+  };
+})();
+
+function applyTheme(){
+  const menacing=mode==="menacing";
+  document.body.classList.toggle("menacing",menacing);
+  wrap.classList.toggle("menacing",menacing);
+  modeLabel.textContent=MODES[mode].label;
+  bestEl.textContent="BEST "+(bests[mode]||0);
+  titleEl.textContent=menacing?"😾 MENACING MODE":"🐱 CAT FLAP";
+  subtitleEl.textContent=menacing
+    ?"The snakes are faster. Stay sharp."
+    :"Choose a difficulty.";
+  selectedInfoEl.textContent=menacing
+    ?"Menacing: angry cat • tighter gaps • faster pace"
+    :"Normal: slower fall • gentle start • gradual speed-up";
+}
+
+function newGame(){
+  game={
+    running:false,over:false,countdown:false,
+    score:0,spawn:0,elapsed:0,speed:MODES[mode].baseSpeed,
+    cat:{x:102,y:H*.45,vy:0,angle:0,blink:0},
+    snakes:[],particles:[]
+  };
+  scoreEl.textContent="0";
+  hintEl.classList.remove("hidden");
+  countdownEl.classList.remove("show");
+}
+
+function chooseMode(nextMode){
+  Sound.unlock();
+  mode=nextMode;
+  applyTheme();
+  newGame();
+  overlay.classList.add("hidden");
+  startCountdown();
+}
+
+function startCountdown(){
+  clearInterval(countdownTimer);
+  game.countdown=true;
+  game.running=false;
+  let n=3;
+  countdownEl.textContent=n;
+  countdownEl.classList.add("show");
+  hintEl.classList.add("hidden");
+  Sound.countdownStart(mode);
+  Sound.tick(mode);
+
+  countdownTimer=setInterval(()=>{
+    n--;
+    if(n>0){
+      countdownEl.textContent=n;
+      countdownEl.classList.remove("show");
+      requestAnimationFrame(()=>countdownEl.classList.add("show"));
+      Sound.tick(mode);
+    }else{
+      clearInterval(countdownTimer);
+      countdownEl.textContent="GO!";
+      countdownEl.classList.remove("show");
+      requestAnimationFrame(()=>countdownEl.classList.add("show"));
+      Sound.go(mode);
+      setTimeout(()=>{
+        countdownEl.classList.remove("show");
+        game.countdown=false;
+        game.running=true;
+        hintEl.classList.remove("hidden");
+        Sound.startMusic(mode,MODES[mode].baseSpeed);
+      },350);
+    }
+  },850);
+}
+
+function flap(){
+  if(!game)return;
+  if(game.over){
+    Haptics.ui();
+    overlay.classList.add("hidden");
+    newGame();
+    startCountdown();
+    return;
+  }
+  if(game.countdown)return;
+  if(!game.running)return;
+  game.cat.vy=MODES[mode].flap;
+  hintEl.classList.add("hidden");
+  burst(game.cat.x-8,game.cat.y+13,5);
+  Sound.flap(mode);
+  Haptics.tap(mode);
+}
+
+function addSnakePair(){
+  const m=MODES[mode];
+  const gap=m.gap;
+  const minTop=92;
+  const maxTop=H-ground-92-gap;
+  const top=minTop+Math.random()*(maxTop-minTop);
+  game.snakes.push({x:W+28,top,bottom:top+gap,w:76,passed:false});
+}
+
+function burst(x,y,n){
+  for(let i=0;i<n;i++){
+    game.particles.push({
+      x,y,dx:(Math.random()-.5)*2.8,dy:(Math.random()-.8)*2.5,
+      life:18+Math.random()*12,r:2+Math.random()*2
+    });
+  }
+}
+
+function die(){
+  if(game.over)return;
+  game.running=false;
+  game.over=true;
+  burst(game.cat.x,game.cat.y,22);
+  Sound.die(mode);
+  Haptics.die(mode);
+
+  if(game.score>(bests[mode]||0)){
+    bests[mode]=game.score;
+    localStorage.setItem("catFlapBests",JSON.stringify(bests));
+    bestEl.textContent="BEST "+game.score;
+  }
+
+  titleEl.textContent=mode==="menacing"?"☠️ CAT GOT BONKED":"💥 BONK!";
+  subtitleEl.textContent=`Score: ${game.score} • Best: ${bests[mode]||0}`;
+  selectedInfoEl.textContent="Choose another mode or press the game area to retry.";
+  normalBtn.textContent="🟢 PLAY NORMAL";
+  menacingBtn.textContent="🔴 PLAY MENACING";
+  overlay.classList.remove("hidden");
+}
+
+function circleRectHit(cx,cy,r,rx,ry,rw,rh){
+  const nx=Math.max(rx,Math.min(cx,rx+rw));
+  const ny=Math.max(ry,Math.min(cy,ry+rh));
+  const dx=cx-nx,dy=cy-ny;
+  return dx*dx+dy*dy<r*r;
+}
+
+function update(dt){
+  for(const p of game.particles){
+    p.x+=p.dx*dt;p.y+=p.dy*dt;p.dy+=.06*dt;p.life-=dt;
+  }
+  game.particles=game.particles.filter(p=>p.life>0);
+
+  if(!game.running)return;
+
+  const m=MODES[mode];
+  const c=game.cat;
+
+  game.elapsed+=dt;
+  // Gradually pace up instead of becoming instantly difficult.
+  const ramp=mode==="normal"
+    ? Math.min(1,(game.elapsed/60)/35)
+    : Math.min(1,(game.elapsed/60)/26);
+  game.speed=m.baseSpeed+(m.maxSpeed-m.baseSpeed)*ramp;
+  Sound.setParams(game.speed,ramp);
+
+  c.vy+=m.gravity*dt;
+  c.y+=c.vy*dt;
+  c.angle=Math.max(-.58,Math.min(1.18,c.vy*.075));
+
+  game.spawn+=dt;
+  const spawnNow=Math.max(70,m.spawnFrames-(ramp*12));
+  if(game.spawn>=spawnNow){
+    addSnakePair();
+    game.spawn=0;
+  }
+
+  for(const s of game.snakes){
+    s.x-=game.speed*dt;
+
+    if(!s.passed && s.x+s.w<c.x){
+      s.passed=true;
+      game.score++;
+      scoreEl.textContent=game.score;
+      burst(c.x,c.y,6);
+      Sound.score(game.score,mode);
+    }
+
+    if(
+      circleRectHit(c.x,c.y,19,s.x+8,0,s.w-16,s.top+8) ||
+      circleRectHit(c.x,c.y,19,s.x+8,s.bottom-8,s.w-16,H-ground-s.bottom+8)
+    ){ die(); }
+  }
+
+  game.snakes=game.snakes.filter(s=>s.x+s.w>-20);
+
+  if(c.y-19<0||c.y+19>H-ground)die();
+}
+
+function drawCloud(x,y,s){
+  ctx.save();
+  ctx.fillStyle=mode==="menacing"?"#ffcad055":"#ffffffaa";
+  ctx.beginPath();
+  ctx.arc(x,y,24*s,0,Math.PI*2);
+  ctx.arc(x+27*s,y+5*s,18*s,0,Math.PI*2);
+  ctx.arc(x-23*s,y+8*s,17*s,0,Math.PI*2);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawBackground(){
+  if(mode==="normal"){
+    const g=ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,"#78d2ff");
+    g.addColorStop(1,"#e3f9ff");
+    ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+    drawCloud(64,108,1);
+    drawCloud(300,165,.8);
+    drawCloud(195,61,.62);
+  }else{
+    const g=ctx.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,"#17050a");
+    g.addColorStop(.48,"#3b0912");
+    g.addColorStop(1,"#090909");
+    ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+
+    // moon
+    ctx.fillStyle="#b21f35";
+    ctx.beginPath();ctx.arc(330,92,54,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle="#5f101d";
+    ctx.beginPath();ctx.arc(347,76,48,0,Math.PI*2);ctx.fill();
+
+    // ominous clouds/fog
+    for(let i=0;i<8;i++){
+      ctx.fillStyle=`rgba(110,12,30,${.08+i%3*.03})`;
+      ctx.beginPath();
+      ctx.ellipse((i*83+40)%W,150+(i%4)*115,95,26,0,0,Math.PI*2);
+      ctx.fill();
+    }
+
+    // distant spikes
+    ctx.fillStyle="#13070a";
+    for(let i=0;i<18;i++){
+      const x=i*28;
+      ctx.beginPath();ctx.moveTo(x,H-ground);ctx.lineTo(x+14,H-ground-30-(i%3)*18);ctx.lineTo(x+28,H-ground);ctx.fill();
+    }
+  }
+}
+
+function drawSnake(x,y,length,up){
+  const cx=x+38;
+  ctx.save();
+  ctx.lineCap="round";
+
+  const dark=mode==="menacing";
+  ctx.strokeStyle=dark?"#50131c":"#3f8f46";
+  ctx.lineWidth=36;
+  ctx.beginPath();ctx.moveTo(cx,y);ctx.lineTo(cx,up?y-length:y+length);ctx.stroke();
+
+  ctx.strokeStyle=dark?"#9e293a":"#68bb5d";
+  ctx.lineWidth=27;
+  ctx.beginPath();ctx.moveTo(cx,y);ctx.lineTo(cx,up?y-length:y+length);ctx.stroke();
+
+  const hy=up?y-length:y+length;
+  ctx.fillStyle=dark?"#671522":"#4b9f48";
+  ctx.beginPath();ctx.arc(cx,hy,23,0,Math.PI*2);ctx.fill();
+
+  ctx.fillStyle=dark?"#ffb3bd":"#161616";
+  ctx.beginPath();ctx.arc(cx-7,hy-5,3.2,0,Math.PI*2);ctx.arc(cx+7,hy-5,3.2,0,Math.PI*2);ctx.fill();
+
+  ctx.strokeStyle=dark?"#ff314f":"#f5d13e";
+  ctx.lineWidth=2.3;
+  ctx.beginPath();ctx.moveTo(cx,hy+15);ctx.lineTo(cx,hy+27);ctx.stroke();
+  ctx.restore();
+}
+
+function drawCat(){
+  const c=game.cat;
+  ctx.save();ctx.translate(c.x,c.y);ctx.rotate(c.angle);
+
+  const angry=mode==="menacing";
+
+  // tail
+  ctx.strokeStyle=angry?"#7c2934":"#d78745";
+  ctx.lineWidth=9;ctx.lineCap="round";
+  ctx.beginPath();ctx.moveTo(-15,7);ctx.quadraticCurveTo(-40,3,-30,-16);ctx.stroke();
+
+  // body
+  ctx.fillStyle=angry?"#9f313f":"#f1a158";
+  ctx.beginPath();ctx.ellipse(0,3,25,18,0,0,Math.PI*2);ctx.fill();
+
+  // ears
+  ctx.beginPath();ctx.moveTo(-18,-12);ctx.lineTo(-21,-32);ctx.lineTo(-3,-20);ctx.fill();
+  ctx.beginPath();ctx.moveTo(4,-20);ctx.lineTo(21,-32);ctx.lineTo(18,-10);ctx.fill();
+
+  // head
+  ctx.fillStyle=angry?"#c13b4a":"#f7b567";
+  ctx.beginPath();ctx.arc(0,-5,21,0,Math.PI*2);ctx.fill();
+
+  // inner ears
+  ctx.fillStyle=angry?"#4d0814":"#ed7c85";
+  ctx.beginPath();ctx.moveTo(-17,-18);ctx.lineTo(-18,-26);ctx.lineTo(-9,-20);ctx.fill();
+  ctx.beginPath();ctx.moveTo(9,-20);ctx.lineTo(18,-26);ctx.lineTo(17,-17);ctx.fill();
+
+  // angry brow / eyes
+  ctx.strokeStyle=angry?"#160307":"#74444c";
+  ctx.lineWidth=3;
+  ctx.beginPath();
+  ctx.moveTo(-13,-13);ctx.lineTo(-3,-10);
+  ctx.moveTo(13,-13);ctx.lineTo(3,-10);
+  ctx.stroke();
+
+  ctx.fillStyle=angry?"#ffe1e5":"#202020";
+  ctx.beginPath();ctx.arc(-7,-7,3.4,0,Math.PI*2);ctx.arc(7,-7,3.4,0,Math.PI*2);ctx.fill();
+
+  // nose + mouth
+  ctx.fillStyle=angry?"#ff5569":"#d75e6f";
+  ctx.beginPath();ctx.arc(0,0,3,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle=angry?"#2a050b":"#74444c";ctx.lineWidth=1.8;
+  ctx.beginPath();
+  if(angry){
+    ctx.moveTo(-10,5);ctx.lineTo(-2,7);ctx.lineTo(-8,11);
+    ctx.moveTo(10,5);ctx.lineTo(2,7);ctx.lineTo(8,11);
+  }else{
+    ctx.moveTo(0,2);ctx.quadraticCurveTo(-4,7,-9,4);
+    ctx.moveTo(0,2);ctx.quadraticCurveTo(4,7,9,4);
+  }
+  ctx.stroke();
+
+  // whiskers
+  ctx.strokeStyle=angry?"#ffb0ba":"#74444c";ctx.lineWidth=1.2;
+  ctx.beginPath();
+  ctx.moveTo(-10,1);ctx.lineTo(-28,-4);
+  ctx.moveTo(-10,6);ctx.lineTo(-28,10);
+  ctx.moveTo(10,1);ctx.lineTo(28,-4);
+  ctx.moveTo(10,6);ctx.lineTo(28,10);
+  ctx.stroke();
+
+  ctx.restore();
+}
+
+function draw(){
+  drawBackground();
+
+  for(const s of game.snakes){
+    drawSnake(s.x,s.top,s.top-10,true);
+    drawSnake(s.x,s.bottom,H-ground-s.bottom-10,false);
+  }
+
+  // ground
+  ctx.fillStyle=mode==="menacing"?"#371119":"#69b84f";
+  ctx.fillRect(0,H-ground,W,12);
+  ctx.fillStyle=mode==="menacing"?"#171010":"#d6a44c";
+  ctx.fillRect(0,H-ground+12,W,ground-12);
+
+  ctx.fillStyle=mode==="menacing"?"#251013":"#bb8a3d";
+  for(let i=0;i<W;i+=30)ctx.fillRect(i,H-ground+31,16,4);
+
+  for(const p of game.particles){
+    ctx.globalAlpha=Math.max(0,p.life/25);
+    ctx.fillStyle=mode==="menacing"?"#ff6175":"#fff";
+    ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill();
+    ctx.globalAlpha=1;
+  }
+
+  drawCat();
+}
+
+function loop(t){
+  const dt=Math.min(2,(t-last)/16.67||1);
+  last=t;
+  update(dt);
+  draw();
+  requestAnimationFrame(loop);
+}
+
+document.addEventListener("keydown",e=>{
+  if(e.code==="Space"||e.code==="ArrowUp"){
+    e.preventDefault();
+    flap();
+  }
+});
+canvas.addEventListener("pointerdown",e=>{
+  e.preventDefault();
+  flap();
+});
+
+normalBtn.addEventListener("click",()=>{Haptics.ui();chooseMode("normal");});
+menacingBtn.addEventListener("click",()=>{Haptics.ui();chooseMode("menacing");});
+
+const soundBtn=document.getElementById("soundBtn");
+const hapticBtn=document.getElementById("hapticBtn");
+function refreshToggles(){
+  soundBtn.textContent=Sound.isEnabled()?"🔊":"🔇";
+  soundBtn.setAttribute("aria-pressed",Sound.isEnabled());
+  if(Haptics.supported){
+    hapticBtn.classList.remove("hidden");
+    hapticBtn.textContent=Haptics.isEnabled()?"📳":"🚫";
+    hapticBtn.setAttribute("aria-pressed",Haptics.isEnabled());
+  }
+}
+soundBtn.addEventListener("pointerdown",e=>{
+  e.preventDefault();e.stopPropagation();
+  Sound.unlock();
+  Sound.setEnabled(!Sound.isEnabled());
+  refreshToggles();
+});
+hapticBtn.addEventListener("pointerdown",e=>{
+  e.preventDefault();e.stopPropagation();
+  Haptics.setEnabled(!Haptics.isEnabled());
+  Haptics.ui();
+  refreshToggles();
+});
+document.addEventListener("visibilitychange",()=>{
+  if(document.hidden)Sound.suspend();else Sound.resume();
+});
+refreshToggles();
+
+newGame();
+applyTheme();
+requestAnimationFrame(loop);
+</script>
+</body>
+</html>
